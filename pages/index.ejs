@@ -16,8 +16,16 @@
     <div class="alert alert-success">Note has been created!</div>
     <% } %>
 
+    <% if (error) {%>
+    <div class="alert alert-danger">Something went wrong!</div>
+    <% } %>
+
     <div class="container">
       <h1><%= title %></h1>
+      <!-- если сервер отклонил данные формы, покажем сообщение и дадим ввести название заново
+      <% if (typeof error !== "undefined" && error) { %>
+      <div class="alert alert-danger" role="alert"><%= error %></div>
+      <% } %> -->
       <!-- создадим интерфейс, который позволит из браузера создавать определенные заметки -->
       <form action="/" method="post" class="mb-2">
         <div class="form-group mb-2">
