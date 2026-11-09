@@ -8,12 +8,19 @@ document.addEventListener("click", async (event) => {
   // обработаем аттрибут data-type="remove" из файла index.ejs
   if (button.dataset.type === "remove") {
     const id = button.dataset.id;
-    remove(id).then(() => {
+    // Раньше удаляли li вручную. Теперь показываем HTML, который вернул сервер.
+    try {
+      button.disabled = true;
+      await remove(id);
       // обновить интерфейс после удаления заметки.
       //   event.target.parentNode.remove();
       // Чтобы верно удалить, давайте привяжемся к классу или тэгу li, потому что если привязаться к крестику, то нужно именно на него нажать, а не на всю кнопку удаления, поэтому сделаем так:
-      event.target.closest("li").remove();
-    });
+      // event.target.closest("li").remove();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      button.disabled = false;
+    }
     // console.log("remove", id);
   }
 
@@ -36,9 +43,11 @@ document.addEventListener("click", async (event) => {
     const buttons = item.querySelectorAll("button");
     buttons.forEach((button) => (button.disabled = true));
     try {
-      const note = await update(button.dataset.id, newTitle);
+      await update(button.dataset.id, newTitle);
+      // Старый вариант ожидал JSON; теперь весь список приходит в HTML.
+      // const note = await update(button.dataset.id, newTitle);
       // меняем текст только после успешного ответа. textContent не превращает введенные теги в HTML
-      titleElement.textContent = note.title;
+      // titleElement.textContent = note.title;
     } catch (error) {
       // при ошибке старое название остается на странице, а пользователь увидит сообщение
       alert(error.message);
@@ -51,7 +60,8 @@ document.addEventListener("click", async (event) => {
 
 // выполняем запрос
 async function remove(id) {
-  await fetch(`/${id}`, { method: "DELETE" });
+  const response = await fetch(`/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await renderResponse(response);
 }
 
 // отправим новое название на сервер. id помещаем в адрес, а title передаем в JSON
@@ -64,17 +74,43 @@ async function update(id, title) {
     body: JSON.stringify({ title }),
   });
 
-  // fetch не выбрасывает ошибку при статусах 400, 404 или 500, поэтому проверяем response.ok сами
-  if (!response.ok) {
-    // если сервер вернул не JSON, все равно покажем понятное сообщение со статусом ответа
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Не удалось сохранить заметку (${response.status})`);
-  }
-  // преобразуем JSON из ответа обратно в объект с id и title
-  return response.json();
+  // Сохраняем предыдущую обработку JSON для сравнения:
+//   // fetch не выбрасывает ошибку при статусах 400, 404 или 500, поэтому проверяем response.ok сами
+//   if (!response.ok) {
+//     // если сервер вернул не JSON, все равно покажем понятное сообщение со статусом ответа
+//     const error = await response.json().catch(() => ({}));
+//     throw new Error(error.message || `Не удалось сохранить заметку (${response.status})`);
+//   }
+//   // преобразуем JSON из ответа обратно в объект с id и title
+//   return response.json();
+
+  // res.render возвращает HTML, поэтому передаём ответ общей функции.
+  await renderResponse(response);
 }
 
 // Express обрабатывает получение страницы, создание и удаление заметок.
 // EJS выводит список и кнопки удаления.
 // Клиентский JavaScript через fetch() отправляет DELETE-запрос и удаляет соответствующий <li>.
 // Контроллер читает и сохраняет заметки в db.json
+
+
+// fetch сам не отображает HTML из res.render: обновляем содержимое страницы явно.
+async function renderResponse(response) {
+  if (response.redirected) {
+    // При истёкшей авторизации fetch получает страницу входа.
+    // Выполняем переход, чтобы адрес браузера тоже изменился.
+    window.location.assign(response.url);
+    return;
+  }
+  if (!response.ok) {
+    throw new Error(`Не удалось выполнить запрос (${response.status})`);
+  }
+
+  // Читаем HTML и разбираем его в отдельный документ.
+  const html = await response.text();
+  const page = new DOMParser().parseFromString(html, "text/html");
+  document.title = page.title;
+  // Заменяем body: показываем список и сообщение error из серверного шаблона.
+  // Обработчик кликов остаётся на document и работает с новыми кнопками.
+  document.body.replaceWith(page.body);
+}

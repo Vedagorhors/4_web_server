@@ -12,12 +12,15 @@
     <title><%= title %></title>
   </head>
   <body>
+    <%- include('./partials/user-header') %>
+
     <% if (created) {%>
     <div class="alert alert-success">Note has been created!</div>
     <% } %>
 
     <% if (error) {%>
-    <div class="alert alert-danger">Something went wrong!</div>
+    <!-- Раньше здесь был текст Something went wrong!; теперь показываем причину от сервера. -->
+    <div class="alert alert-danger"><%= error %></div>
     <% } %>
 
     <div class="container">
@@ -45,9 +48,17 @@
           <li
             class="list-group-item d-flex justify-content-between align-items-center"
           >
+            <!-- Название выводим один раз; data-note-title нужен public/app.js для редактирования. -->
+            <span data-note-title>
+              <%=notes[i].title %>
+            </span>
+            <span>
+              <%=notes[i].owner %>
+            </span>
+            <% if (notes[i].owner === userEmail) { %>
             <!-- Выводим название текущей заметки -->
             <!-- поместим название в span, чтобы при редактировании менять только текст, а кнопки оставить -->
-            <span data-note-title><%= notes[i].title %></span>
+            <!-- Название уже выведено выше. Внутри условия оставляем только кнопки владельца. -->
             <div class="d-flex gap-2 ms-3">
               <!-- по data-type определим действие, а по data-id найдем нужную заметку на сервере -->
               <button
@@ -67,6 +78,7 @@
                 &times;
               </button>
             </div>
+            <% } %>
           </li>
           <% } %>
         </ul>

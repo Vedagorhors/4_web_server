@@ -6,8 +6,8 @@ const Note = require("./models/Note");
 const { log } = require("console");
 
 // const notesPath = path.join(__dirname, "db.json"); - не нужен для работы с MongoDB и mongoose
-
-async function addNote(title) {
+// добавим собственника заметку
+async function addNote(title, owner) {
   // оставим старый вариант для сравнения: раньше добавляли заметку в массив и сохраняли его в db.json
   // получаем заметку
   // const notes = await getNotes();
@@ -22,7 +22,8 @@ async function addNote(title) {
   // await saveNotes(notes);
   // теперь читаем заметки из MongoDB, поэтому и новую заметку нужно сохранить туда же
   // create проверит данные по схеме, создаст документ с _id и запишет его в коллекцию notes
-  await Note.create({ title });
+  // сохраним собственника в базе
+  await Note.create({ title, owner });
   console.log(chalk.bgGreen("Note was added!"));
 }
 
@@ -56,9 +57,13 @@ async function getNotes() {
 //   });
 // }
 
-async function removeNote(id) {
-  // для работы с mongoose, база данных в MongoDB:
-  await Note.deleteOne({ _id: id });
+async function removeNote(id, owner) {
+  // для работы с mongoose, база данных в MongoDB. Смотрим на сайте https://mongoosejs.com/docs/models.html как делать удаление и применяем метод deleteOne и в нем передаем id:
+  const result = await Note.deleteOne({ _id: id, owner });
+
+  if (result.matchedCount === 0) {
+    throw new Error("No note to delete");
+  }
   // ниже код использовался с db.json, а теперь мы сделали с mongoose, база данных в MongoDB
   // // получим заметку
   // const notes = await getNotes();
@@ -69,11 +74,27 @@ async function removeNote(id) {
   console.log(chalk.red(`Note with id="${id}" has been removed.`));
 }
 
-async function updateNote(noteData) {
+async function updateNote(noteData, owner) {
   // заменим код обновления/редактрования заметок под работу с mongoose, база данных в MongoDB
   // смотрим как делается обновление в документации: https://mongoosejs.com/docs/models.html
   // в updateOne первым аргументом передаем объект для фильтрации, то есть какие документы мы хотим обновить, а вторым аргументом передаем что мы хотим изменить в документе, а мы хотим изменить title
-  await Note.updateOne({ _id: noteData.id }, { title: noteData.title });
+  const result = await Note.updateOne(
+    { _id: noteData.id, owner },
+    { title: noteData.title },
+  );
+  // console.log(result); - в консоли выдаст следующее:
+  // {
+  //   acknowledged: true,
+  //   modifiedCount: 0,
+  //   upsertedId: null,
+  //   upsertedCount: 0,
+  //   matchedCount: 0
+  // }
+  // то есть нули, ничего не произошло. Сделаем проверку
+  if (result.matchedCount === 0) {
+    throw new Error("No note to edit");
+  }
+
   // это старый код обновления или редактирования заметок, когда мы работали с db.json
   // const notes = await getNotes();
   // const index = notes.findIndex((note) => note.id === noteData.id);
